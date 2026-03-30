@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NCR Ranger Helmet — Parts Tracker v3.4</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0e0f0c;
+    --surface: #161810;
+    --surface2: #1e2018;
+    --border: #2a2e22;
+    --border2: #3a4030;
+    --text: #c8cdb8;
+    --text2: #7a8068;
+    --accent: #8fa832;
+    --accent2: #b8d438;
+    --ordered: #d4a017;
+    --shipped: #4a9eda;
+    --received: #6abf4b;
+    --unordered: #3a4030;
+    --mono: 'Share Tech Mono', monospace;
+    --head: 'Barlow Condensed', sans-serif;
+    --body: 'Barlow', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 14px;
+    min-height: 100vh;
+    padding: 0 0 60px;
+  }
+
+  /* Header */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border2);
+    padding: 24px 32px 20px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-top {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .version-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  h1 {
+    font-family: var(--head);
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #e8edda;
+    line-height: 1;
+  }
+  h1 span { color: var(--accent2); }
+
+  /* Stats bar */
+  .stats {
+    display: flex;
+    gap: 24px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .stat {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--head);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .stat-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+  .stat-count {
+    font-family: var(--mono);
+    font-size: 15px;
+  }
+  .dot-unordered { background: var(--unordered); border: 1px solid var(--border2); }
+  .dot-ordered   { background: var(--ordered); }
+  .dot-shipped   { background: var(--shipped); }
+  .dot-received  { background: var(--received); }
+
+  /* Progress bar */
+  .progress-track {
+    height: 3px;
+    background: var(--border);
+    margin-top: 14px;
+    border-radius: 2px;
+    overflow: hidden;
+    display: flex;
+  }
+  .progress-seg { height: 100%; transition: width 0.4s ease; }
+  .seg-ordered  { background: var(--ordered); }
+  .seg-shipped  { background: var(--shipped); }
+  .seg-received { background: var(--received); }
+
+  /* Cost summary */
+  .cost-bar {
+    display: flex;
+    gap: 20px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .cost-item {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text2);
+  }
+  .cost-item span { color: var(--text); }
+
+  /* Filter tabs */
+  .filters {
+    padding: 14px 32px 0;
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    font-family: var(--head);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 5px 14px;
+    border-radius: 2px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-btn:hover { color: var(--text); border-color: var(--accent); }
+  .filter-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+  /* Table */
+  .table-wrap {
+    padding: 16px 32px 0;
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  thead th {
+    font-family: var(--head);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text2);
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border2);
+    white-space: nowrap;
+  }
+  thead th:first-child { padding-left: 0; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  tbody tr:hover { background: var(--surface2); }
+  tbody tr.hidden { display: none; }
+
+  tbody td {
+    padding: 10px 12px;
+    vertical-align: middle;
+  }
+  tbody td:first-child { padding-left: 0; }
+
+  .item-name {
+    font-family: var(--body);
+    font-weight: 500;
+    color: #dde3cc;
+  }
+  .item-source {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+  .item-category {
+    font-family: var(--head);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text2);
+    white-space: nowrap;
+  }
+  .item-qty {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-align: center;
+  }
+  .item-cost {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent2);
+    white-space: nowrap;
+  }
+
+  /* Status badge + cycle button */
+  .status-cell {
+    white-space: nowrap;
+    min-width: 130px;
+  }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px 4px 8px;
+    border-radius: 2px;
+    font-family: var(--head);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .status-badge:hover { filter: brightness(1.15); }
+  .status-badge:active { transform: scale(0.97); }
+
+  .status-badge .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .s-unordered { background: rgba(58,64,48,0.4); border-color: var(--border2); color: var(--text2); }
+  .s-unordered .dot { background: var(--text2); }
+
+  .s-ordered { background: rgba(212,160,23,0.15); border-color: rgba(212,160,23,0.4); color: var(--ordered); }
+  .s-ordered .dot { background: var(--ordered); }
+
+  .s-shipped { background: rgba(74,158,218,0.15); border-color: rgba(74,158,218,0.4); color: var(--shipped); }
+  .s-shipped .dot { background: var(--shipped); }
+
+  .s-received { background: rgba(106,191,75,0.15); border-color: rgba(106,191,75,0.4); color: var(--received); }
+  .s-received .dot { background: var(--received); }
+
+  /* Notes field */
+  .notes-input {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    color: var(--text2);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 3px 6px;
+    width: 100%;
+    min-width: 120px;
+    transition: all 0.15s;
+    outline: none;
+  }
+  .notes-input:hover { border-color: var(--border2); }
+  .notes-input:focus { border-color: var(--accent); color: var(--text); background: var(--surface2); }
+  .notes-input::placeholder { color: var(--border2); }
+
+  /* Section divider rows */
+  .section-row td {
+    padding: 18px 0 6px;
+  }
+  .section-label {
+    font-family: var(--head);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border-bottom: 1px solid var(--border2);
+    padding-bottom: 4px;
+    display: block;
+  }
+
+  /* Total row */
+  .total-row td {
+    padding-top: 16px;
+    border-top: 2px solid var(--border2);
+    border-bottom: none;
+  }
+  .total-label {
+    font-family: var(--head);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+  .total-cost {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--accent2);
+    font-weight: bold;
+  }
+
+  /* Save indicator */
+  .save-indicator {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text2);
+    text-align: right;
+    padding: 8px 32px 0;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .save-indicator.show { opacity: 1; }
+
+  /* Auth bar */
+  .auth-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 32px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border2);
+  }
+  .auth-bar p {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text2);
+    flex: 1;
+  }
+  .auth-btn {
+    font-family: var(--head);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 6px 18px;
+    border-radius: 2px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: var(--bg);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .auth-btn:hover { background: var(--accent2); border-color: var(--accent2); }
+
+  /* Tooltip hint */
+  .hint {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text2);
+    padding: 10px 32px 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div class="title-block">
+      <div class="version-tag">NCR Ranger Helmet — v3.4</div>
+      <h1>Parts <span>Tracker</span></h1>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-dot dot-unordered"></div><span class="stat-count" id="cnt-unordered">0</span>&nbsp;Unordered</div>
+    <div class="stat"><div class="stat-dot dot-ordered"></div><span class="stat-count" id="cnt-ordered">0</span>&nbsp;Ordered</div>
+    <div class="stat"><div class="stat-dot dot-shipped"></div><span class="stat-count" id="cnt-shipped">0</span>&nbsp;Shipped</div>
+    <div class="stat"><div class="stat-dot dot-received"></div><span class="stat-count" id="cnt-received">0</span>&nbsp;Received</div>
+  </div>
+  <div class="progress-track">
+    <div class="progress-seg seg-received" id="prog-received" style="width:0%"></div>
+    <div class="progress-seg seg-shipped"  id="prog-shipped"  style="width:0%"></div>
+    <div class="progress-seg seg-ordered"  id="prog-ordered"  style="width:0%"></div>
+  </div>
+  <div class="cost-bar">
+    <div class="cost-item">Total est: <span id="cost-total">—</span></div>
+    <div class="cost-item">Received: <span id="cost-received">$0</span></div>
+    <div class="cost-item">Outstanding: <span id="cost-outstanding">—</span></div>
+  </div>
+</div>
+
+<div class="auth-bar" id="auth-bar">
+  <p>Sign in with Google to load and save your order progress to Google Drive.</p>
+  <button class="auth-btn" onclick="signIn()">Sign in with Google</button>
+</div>
+
+<div class="filters">
+  <button class="filter-btn active" data-filter="all">All</button>
+  <button class="filter-btn" data-filter="unordered">Unordered</button>
+  <button class="filter-btn" data-filter="ordered">Ordered</button>
+  <button class="filter-btn" data-filter="shipped">Shipped</button>
+  <button class="filter-btn" data-filter="received">Received</button>
+</div>
+
+<div class="hint">Click any status badge to cycle: Unordered → Ordered → Shipped → Received. Progress saves automatically to Google Drive.</div>
+<div class="save-indicator" id="save-ind">✓ saved</div>
+
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr>
+      <th style="width:28%">Item</th>
+      <th style="width:10%">Category</th>
+      <th style="width:5%">Qty</th>
+      <th style="width:8%">Est. Cost</th>
+      <th style="width:14%">Status</th>
+      <th>Notes / Order ref</th>
+    </tr>
+  </thead>
+  <tbody id="bom-body"></tbody>
+</table>
+</div>
+
+<!-- Google Identity Services + Drive API — load synchronously to guarantee availability -->
+<script src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+<script src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+
+<script>
+// ─── Google Drive config ───────────────────────────────────────────────────
+// SETUP (one-time, ~5 min):
+// 1. Go to https://console.cloud.google.com
+// 2. Create a project (e.g. "NCR BOM Tracker")
+// 3. Enable "Google Drive API"
+// 4. Go to APIs & Services → Credentials → Create OAuth 2.0 Client ID
+//    Application type: Web application
+//    Authorised JavaScript origins: add the URL you open this file from
+//    (e.g. https://drive.google.com if hosting there, or your server URL)
+// 5. Paste your Client ID below
+const CLIENT_ID  = '177302262150-jg9vujkv0kh6lnce2g7vads8rlpp4ui8.apps.googleusercontent.com';
+const SCOPES     = 'https://www.googleapis.com/auth/drive.appdata';
+const DRIVE_FILE = 'ncr_bom_state.json';
+// ──────────────────────────────────────────────────────────────────────────
+
+const STATUSES = ['unordered','ordered','shipped','received'];
+const STATUS_LABELS = { unordered:'Unordered', ordered:'Ordered', shipped:'Shipped', received:'Received' };
+
+const BOM = [
+  { section: 'Core Electronics' },
+  { id:'mcu',      name:'Arduino Nano ESP32 ABX00083',           source:'Arduino / SparkFun',            cat:'MCU',        qty:'1',  cost:20 },
+  { id:'codec',    name:'PCB Artists ES8388 audio codec module', source:'pcbartists.com / Tindie',       cat:'Audio',      qty:'1',  cost:17 },
+  { id:'amp',      name:'PAM8610 amplifier module',              source:'Amazon / AliExpress',           cat:'Audio',      qty:'1',  cost:3  },
+  { id:'bme',      name:'BME280 I2C breakout',                   source:'Amazon / AdaFruit',             cat:'Sensor',     qty:'1',  cost:4  },
+
+  { section: 'Voice Chain' },
+  { id:'vmic',     name:'PUI AOM-5024L-HD-R mic capsule',        source:'DigiKey',                       cat:'Mic',        qty:'1',  cost:4  },
+  { id:'spk',      name:'Visaton K50-8 speaker',                 source:'Parts Express / Amazon',        cat:'Speaker',    qty:'1',  cost:8  },
+
+  { section: 'Ambient Hearing' },
+  { id:'amic',     name:'CMA-4544PF-W mic capsule',              source:'DigiKey — 102-1721-ND',         cat:'Mic',        qty:'2',  cost:1.50 },
+  { id:'preamp',   name:'AD828 stereo mic preamp board',          source:'Amazon — Acxico / Rakstore AD828', cat:'Audio',   qty:'1',  cost:4  },
+  { id:'lcfilter', name:'LC filter — 10µH ferrite bead + 100µF cap (AD828 supply noise filter)', source:'DigiKey / Amazon', cat:'Hardware', qty:'1', cost:1 },
+  { id:'jack',     name:'3.5mm panel mount stereo jack',         source:'Amazon / DigiKey',              cat:'Audio',      qty:'1',  cost:1  },
+  { id:'iems',     name:'Wired IEMs — dedicated build pair',     source:'Amazon (KZ/Moondrop/7Hz)',      cat:'Audio',      qty:'1',  cost:25 },
+
+  { section: 'Camera & Display' },
+  { id:'cam',      name:'Arducam OV2640 2MP DVP camera',         source:'Amazon / Arducam',              cat:'Camera',     qty:'1',  cost:8  },
+  { id:'disp',     name:'GC9A01 1.28" round IPS display',        source:'Amazon / AliExpress',           cat:'Display',    qty:'1',  cost:6  },
+
+  { section: 'Fans' },
+  { id:'fana',     name:'WINSINN 2507 5V fan (Fan A — electronics exhaust)', source:'Amazon',           cat:'Fan',        qty:'1',  cost:5  },
+  { id:'fancr',    name:'5015 radial blower 5V (Fan C Right — anti-fog defogging)', source:'Amazon / AliExpress', cat:'Fan', qty:'1', cost:5 },
+  { id:'fancl',    name:'5015 radial blower 5V (Fan C Left — crown ventilation)', source:'Amazon / AliExpress',  cat:'Fan', qty:'1', cost:5 },
+
+  { section: 'Ventilation Tubing' },
+  { id:'tube',     name:'Silicone tube 8mm ID × 10mm OD — 3m roll', source:'Amazon — uxcell',          cat:'Tubing',     qty:'1',  cost:9  },
+  { id:'elbow',    name:'PETG elbow adapter — 5015 outlet → 8mm barb', source:'Print — own filament',  cat:'Print',      qty:'1',  cost:1  },
+  { id:'endcap',   name:'PETG crown tube end cap (press-fit)',    source:'Print — own filament',         cat:'Print',      qty:'1',  cost:1  },
+
+  { section: 'Power' },
+  { id:'cells',    name:'18650 Li-ion cells',                    source:'Amazon / Battery store',        cat:'Power',      qty:'4',  cost:20 },
+  { id:'bms',      name:'2S BMS board',                          source:'Amazon / AliExpress',           cat:'Power',      qty:'1',  cost:5  },
+  { id:'buck',     name:'5V buck converter 2A+ ×2',              source:'Amazon / AliExpress',           cat:'Power',      qty:'2',  cost:6  },
+  { id:'mosfet',   name:'IRLML6244 or 2N7002 MOSFET ×4',        source:'DigiKey / Amazon',              cat:'Power',      qty:'4',  cost:2  },
+  { id:'rockers',  name:'Mini rocker switch ×4',                 source:'Amazon',                        cat:'Power',      qty:'4',  cost:4  },
+
+  { section: 'Mesh' },
+  { id:'mesh',     name:'Stainless woven wire mesh 30–40 LPI',   source:'Amazon / McMaster-Carr 9225T61',cat:'Mesh',       qty:'1',  cost:11 },
+
+  { section: 'Mechanical & Padding' },
+  { id:'pads',     name:'Oregon Aero / Team Wendy 7-pad kit',    source:'Amazon / Oregon Aero',          cat:'Padding',    qty:'1',  cost:40 },
+  { id:'petg',     name:'PETG filament — adapters + inserts',    source:'Own stock',                     cat:'Print',      qty:'—',  cost:5  },
+  { id:'hw',       name:'M3 bolts, nyloc nuts, D-rings, plates', source:'Hardware store',                cat:'Hardware',   qty:'—',  cost:8  },
+  { id:'velcro',   name:'25mm Velcro strip — hook + loop',       source:'Amazon',                        cat:'Hardware',   qty:'1',  cost:3  },
+  { id:'adh',      name:'E6000, JB Weld, foam gasket material',  source:'Hardware store',                cat:'Adhesive',   qty:'—',  cost:10 },
+];
+
+const TOTAL_COST = BOM.filter(r=>r.cost).reduce((a,r)=>a+r.cost,0);
+
+// ─── Drive state ───────────────────────────────────────────────────────────
+let state = {};
+let currentFilter = 'all';
+let driveFileId = null;
+let tokenClient = null;
+let saveTimer = null;
+
+function setStatus(msg, ok) {
+  const el = document.getElementById('save-ind');
+  el.textContent = msg;
+  el.style.color = ok === false ? '#e05c5c' : ok === true ? 'var(--received)' : 'var(--text2)';
+  el.classList.add('show');
+  if (ok !== null) {
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), 2400);
+  }
+}
+
+// Find or create the state file in Drive appdata folder
+async function findOrCreateFile() {
+  // Search for existing file
+  const searchRes = await gapi.client.drive.files.list({
+    spaces: 'appDataFolder',
+    q: `name='${DRIVE_FILE}'`,
+    fields: 'files(id,name)',
+  });
+  const files = searchRes.result.files;
+  if (files && files.length > 0) {
+    driveFileId = files[0].id;
+    return driveFileId;
+  }
+  // Create new file
+  const createRes = await gapi.client.drive.files.create({
+    resource: { name: DRIVE_FILE, parents: ['appDataFolder'] },
+    fields: 'id',
+  });
+  driveFileId = createRes.result.id;
+  return driveFileId;
+}
+
+async function loadFromDrive() {
+  try {
+    setStatus('⟳ loading…', null);
+    await findOrCreateFile();
+    const res = await gapi.client.drive.files.get({
+      fileId: driveFileId,
+      alt: 'media',
+    });
+    state = (typeof res.result === 'object' && res.result !== null) ? res.result : {};
+    setStatus('✓ loaded', true);
+  } catch(e) {
+    if (e.status === 404 || (e.result && e.result.error && e.result.error.code === 404)) {
+      state = {};
+      setStatus('✓ new file', true);
+    } else {
+      console.error('Drive load error', e);
+      setStatus('⚠ load failed — working offline', false);
+    }
+  }
+  buildTable();
+  updateStats();
+}
+
+async function saveToDrive() {
+  if (!driveFileId) return;
+  try {
+    setStatus('⟳ saving…', null);
+    const boundary = '-------314159265358979323846';
+    const body = [
+      `--${boundary}`,
+      'Content-Type: application/json; charset=UTF-8',
+      '',
+      JSON.stringify({ name: DRIVE_FILE, parents: ['appDataFolder'] }),
+      `--${boundary}`,
+      'Content-Type: application/json',
+      '',
+      JSON.stringify(state),
+      `--${boundary}--`,
+    ].join('\r\n');
+
+    await gapi.client.request({
+      path: `/upload/drive/v3/files/${driveFileId}`,
+      method: 'PATCH',
+      params: { uploadType: 'multipart' },
+      headers: { 'Content-Type': `multipart/related; boundary="${boundary}"` },
+      body,
+    });
+    setStatus('✓ saved to Drive', true);
+  } catch(e) {
+    console.error('Drive save error', e);
+    setStatus('⚠ save failed', false);
+  }
+}
+
+function saveState(s) {
+  state = s;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveToDrive, 800); // debounce — batch rapid clicks
+}
+
+// ─── Google Auth — two-flag init ──────────────────────────────────────────
+// Both gapi.js and gsi/client load independently. We wait for both before
+// initialising so neither script races the other.
+let _gapiReady = false;
+let _gisReady  = false;
+
+function gapiLoaded() {
+  gapi.load('client', async () => {
+    await gapi.client.init({});
+    await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
+    _gapiReady = true;
+    maybeInit();
+  });
+}
+
+function gisLoaded() {
+  _gisReady = true;
+  maybeInit();
+}
+
+function maybeInit() {
+  if (!_gapiReady || !_gisReady) return; // wait for both
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: async (tokenResponse) => {
+      if (tokenResponse.error) {
+        setStatus('⚠ sign-in failed', false);
+        return;
+      }
+      gapi.client.setToken(tokenResponse);
+      document.getElementById('auth-bar').style.display = 'none';
+      await loadFromDrive();
+    },
+  });
+  // Both scripts ready — token client initialised, sign-in bar already visible
+  setStatus('Sign in to load your saved data', null);
+}
+
+function signIn() {
+  if (CLIENT_ID === 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com') {
+    alert('Setup required: replace YOUR_CLIENT_ID_HERE with your OAuth Client ID.');
+    return;
+  }
+  if (!_gapiReady) {
+    alert('Google API (gapi) not loaded yet. Check your network connection and that the file is served over HTTP/HTTPS, not opened as a local file://');
+    return;
+  }
+  if (!_gisReady) {
+    alert('Google Identity Services not loaded yet. Check your network connection and that the file is served over HTTP/HTTPS, not opened as a local file://');
+    return;
+  }
+  if (!tokenClient) {
+    alert('Token client not initialised — maybeInit() did not complete. Check the browser console for errors.');
+    return;
+  }
+  tokenClient.requestAccessToken({ prompt: 'consent' });
+}
+
+function getStatus(id) { return state[id]?.status || 'unordered'; }
+function getNotes(id)  { return state[id]?.notes  || ''; }
+
+function cycleStatus(id) {
+  const cur = getStatus(id);
+  const next = STATUSES[(STATUSES.indexOf(cur)+1) % STATUSES.length];
+  if (!state[id]) state[id] = {};
+  state[id].status = next;
+  saveState(state);
+  renderBadge(id);
+  updateStats();
+  applyFilter(currentFilter);
+}
+
+function setNotes(id, val) {
+  if (!state[id]) state[id] = {};
+  state[id].notes = val;
+  saveState(state);
+}
+
+function renderBadge(id) {
+  const badge = document.querySelector(`[data-badge="${id}"]`);
+  if (!badge) return;
+  const s = getStatus(id);
+  badge.className = `status-badge s-${s}`;
+  badge.innerHTML = `<span class="dot"></span>${STATUS_LABELS[s]}`;
+}
+
+function updateStats() {
+  const items = BOM.filter(r=>r.id);
+  const counts = { unordered:0, ordered:0, shipped:0, received:0 };
+  let costReceived = 0;
+  items.forEach(r => {
+    const s = getStatus(r.id);
+    counts[s]++;
+    if (s === 'received' && r.cost) costReceived += r.cost;
+  });
+  const total = items.length;
+  document.getElementById('cnt-unordered').textContent = counts.unordered;
+  document.getElementById('cnt-ordered').textContent   = counts.ordered;
+  document.getElementById('cnt-shipped').textContent   = counts.shipped;
+  document.getElementById('cnt-received').textContent  = counts.received;
+  document.getElementById('prog-received').style.width = (counts.received/total*100)+'%';
+  document.getElementById('prog-shipped').style.width  = (counts.shipped/total*100)+'%';
+  document.getElementById('prog-ordered').style.width  = (counts.ordered/total*100)+'%';
+  document.getElementById('cost-total').textContent    = '$'+TOTAL_COST.toFixed(0);
+  document.getElementById('cost-received').textContent = '$'+costReceived.toFixed(0);
+  document.getElementById('cost-outstanding').textContent = '$'+(TOTAL_COST-costReceived).toFixed(0);
+}
+
+function applyFilter(filter) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter===filter));
+  document.querySelectorAll('tr[data-id]').forEach(row => {
+    const s = getStatus(row.dataset.id);
+    row.classList.toggle('hidden', filter !== 'all' && s !== filter);
+  });
+  document.querySelectorAll('.section-row').forEach(row => {
+    // show section if any visible item follows it
+    let next = row.nextElementSibling;
+    let visible = false;
+    while (next && !next.classList.contains('section-row') && !next.classList.contains('total-row')) {
+      if (!next.classList.contains('hidden')) { visible = true; break; }
+      next = next.nextElementSibling;
+    }
+    row.classList.toggle('hidden', !visible && filter !== 'all');
+  });
+}
+
+function buildTable() {
+  const tbody = document.getElementById('bom-body');
+  let html = '';
+  BOM.forEach(row => {
+    if (row.section) {
+      html += `<tr class="section-row"><td colspan="6"><span class="section-label">${row.section}</span></td></tr>`;
+      return;
+    }
+    const costStr = row.cost ? '$'+row.cost.toFixed(2) : '—';
+    html += `
+      <tr data-id="${row.id}">
+        <td><div class="item-name">${row.name}</div><div class="item-source">${row.source}</div></td>
+        <td><div class="item-category">${row.cat}</div></td>
+        <td><div class="item-qty">${row.qty}</div></td>
+        <td><div class="item-cost">${costStr}</div></td>
+        <td class="status-cell">
+          <span class="status-badge" data-badge="${row.id}" onclick="cycleStatus('${row.id}')"></span>
+        </td>
+        <td>
+          <input class="notes-input" placeholder="order ref / notes…"
+            value="${getNotes(row.id)}"
+            oninput="setNotes('${row.id}', this.value)">
+        </td>
+      </tr>`;
+  });
+  // Total row
+  html += `<tr class="total-row">
+    <td colspan="3"><span class="total-label">Estimated total</span></td>
+    <td><span class="total-cost">~$${TOTAL_COST.toFixed(0)}</span></td>
+    <td colspan="2"></td>
+  </tr>`;
+  tbody.innerHTML = html;
+  BOM.filter(r=>r.id).forEach(r => renderBadge(r.id));
+}
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => applyFilter(btn.dataset.filter));
+});
+
+// Render table immediately — auth is independent, table shows regardless
+document.addEventListener('DOMContentLoaded', () => {
+  buildTable();
+  updateStats();
+});
+</script>
+</body>
+</html>
