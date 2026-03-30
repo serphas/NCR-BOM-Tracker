@@ -400,8 +400,9 @@
 </div>
 
 <div class="auth-bar" id="auth-bar">
-  <p>Sign in with Google to load and save your order progress to Google Drive.</p>
-  <button class="auth-btn" onclick="signIn()">Sign in with Google</button>
+  <p>Progress auto-saves to this browser. Use Export/Import to back up or transfer your data.</p>
+  <button class="auth-btn" onclick="importState()">⬆ Import</button>
+  <button class="auth-btn" onclick="exportState()">⬇ Export</button>
 </div>
 
 <div class="filters">
@@ -412,7 +413,7 @@
   <button class="filter-btn" data-filter="received">Received</button>
 </div>
 
-<div class="hint">Click any status badge to cycle: Unordered → Ordered → Shipped → Received. Progress saves automatically to Google Drive.</div>
+<div class="hint">Click any status badge to cycle: Unordered → Ordered → Shipped → Received. Progress auto-saves to this browser.</div>
 <div class="save-indicator" id="save-ind">✓ saved</div>
 
 <div class="table-wrap">
@@ -431,26 +432,7 @@
 </table>
 </div>
 
-<!-- Google Identity Services + Drive API — load synchronously to guarantee availability -->
-<script src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
-<script src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
-
 <script>
-// ─── Google Drive config ───────────────────────────────────────────────────
-// SETUP (one-time, ~5 min):
-// 1. Go to https://console.cloud.google.com
-// 2. Create a project (e.g. "NCR BOM Tracker")
-// 3. Enable "Google Drive API"
-// 4. Go to APIs & Services → Credentials → Create OAuth 2.0 Client ID
-//    Application type: Web application
-//    Authorised JavaScript origins: add the URL you open this file from
-//    (e.g. https://drive.google.com if hosting there, or your server URL)
-// 5. Paste your Client ID below
-const CLIENT_ID  = '177302262150-jg9vujkv0kh6lnce2g7vads8rlpp4ui8.apps.googleusercontent.com';
-const SCOPES     = 'https://www.googleapis.com/auth/drive.appdata';
-const DRIVE_FILE = 'ncr_bom_state.json';
-// ──────────────────────────────────────────────────────────────────────────
-
 const STATUSES = ['unordered','ordered','shipped','received'];
 const STATUS_LABELS = { unordered:'Unordered', ordered:'Ordered', shipped:'Shipped', received:'Received' };
 
@@ -506,96 +488,23 @@ const BOM = [
 
 const TOTAL_COST = BOM.filter(r=>r.cost).reduce((a,r)=>a+r.cost,0);
 
-// ─── Drive state ───────────────────────────────────────────────────────────
+// ─── State — localStorage, persists across opens of the same file path ────
+const STORAGE_KEY = 'ncr_bom_v34';
+
 let state = {};
 let currentFilter = 'all';
-let driveFileId = null;
-let tokenClient = null;
 let saveTimer = null;
 
-function setStatus(msg, ok) {
-  const el = document.getElementById('save-ind');
-  el.textContent = msg;
-  el.style.color = ok === false ? '#e05c5c' : ok === true ? 'var(--received)' : 'var(--text2)';
-  el.classList.add('show');
-  if (ok !== null) {
-    clearTimeout(el._t);
-    el._t = setTimeout(() => el.classList.remove('show'), 2400);
-  }
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+  catch(e) { return {}; }
 }
 
-// Find or create the state file in Drive appdata folder
-async function findOrCreateFile() {
-  // Search for existing file
-  const searchRes = await gapi.client.drive.files.list({
-    spaces: 'appDataFolder',
-    q: `name='${DRIVE_FILE}'`,
-    fields: 'files(id,name)',
-  });
-  const files = searchRes.result.files;
-  if (files && files.length > 0) {
-    driveFileId = files[0].id;
-    return driveFileId;
-  }
-  // Create new file
-  const createRes = await gapi.client.drive.files.create({
-    resource: { name: DRIVE_FILE, parents: ['appDataFolder'] },
-    fields: 'id',
-  });
-  driveFileId = createRes.result.id;
-  return driveFileId;
-}
-
-async function loadFromDrive() {
+function persistState() {
   try {
-    setStatus('⟳ loading…', null);
-    await findOrCreateFile();
-    const res = await gapi.client.drive.files.get({
-      fileId: driveFileId,
-      alt: 'media',
-    });
-    state = (typeof res.result === 'object' && res.result !== null) ? res.result : {};
-    setStatus('✓ loaded', true);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    setStatus('✓ saved', true);
   } catch(e) {
-    if (e.status === 404 || (e.result && e.result.error && e.result.error.code === 404)) {
-      state = {};
-      setStatus('✓ new file', true);
-    } else {
-      console.error('Drive load error', e);
-      setStatus('⚠ load failed — working offline', false);
-    }
-  }
-  buildTable();
-  updateStats();
-}
-
-async function saveToDrive() {
-  if (!driveFileId) return;
-  try {
-    setStatus('⟳ saving…', null);
-    const boundary = '-------314159265358979323846';
-    const body = [
-      `--${boundary}`,
-      'Content-Type: application/json; charset=UTF-8',
-      '',
-      JSON.stringify({ name: DRIVE_FILE, parents: ['appDataFolder'] }),
-      `--${boundary}`,
-      'Content-Type: application/json',
-      '',
-      JSON.stringify(state),
-      `--${boundary}--`,
-    ].join('\r\n');
-
-    await gapi.client.request({
-      path: `/upload/drive/v3/files/${driveFileId}`,
-      method: 'PATCH',
-      params: { uploadType: 'multipart' },
-      headers: { 'Content-Type': `multipart/related; boundary="${boundary}"` },
-      body,
-    });
-    setStatus('✓ saved to Drive', true);
-  } catch(e) {
-    console.error('Drive save error', e);
     setStatus('⚠ save failed', false);
   }
 }
@@ -603,66 +512,51 @@ async function saveToDrive() {
 function saveState(s) {
   state = s;
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveToDrive, 800); // debounce — batch rapid clicks
+  saveTimer = setTimeout(persistState, 600);
 }
 
-// ─── Google Auth — two-flag init ──────────────────────────────────────────
-// Both gapi.js and gsi/client load independently. We wait for both before
-// initialising so neither script races the other.
-let _gapiReady = false;
-let _gisReady  = false;
-
-function gapiLoaded() {
-  gapi.load('client', async () => {
-    await gapi.client.init({});
-    await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
-    _gapiReady = true;
-    maybeInit();
-  });
+function setStatus(msg, ok) {
+  const el = document.getElementById('save-ind');
+  el.textContent = msg;
+  el.style.color = ok === false ? '#e05c5c' : ok === true ? 'var(--received)' : 'var(--text2)';
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2000);
 }
 
-function gisLoaded() {
-  _gisReady = true;
-  maybeInit();
+// ─── Export / Import ──────────────────────────────────────────────────────
+function exportState() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ncr_bom_state.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
-function maybeInit() {
-  if (!_gapiReady || !_gisReady) return; // wait for both
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: SCOPES,
-    callback: async (tokenResponse) => {
-      if (tokenResponse.error) {
-        setStatus('⚠ sign-in failed', false);
-        return;
+function importState() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const imported = JSON.parse(ev.target.result);
+        state = imported;
+        persistState();
+        buildTable();
+        updateStats();
+        setStatus('✓ imported', true);
+      } catch(err) {
+        setStatus('⚠ invalid file', false);
       }
-      gapi.client.setToken(tokenResponse);
-      document.getElementById('auth-bar').style.display = 'none';
-      await loadFromDrive();
-    },
-  });
-  // Both scripts ready — token client initialised, sign-in bar already visible
-  setStatus('Sign in to load your saved data', null);
-}
-
-function signIn() {
-  if (CLIENT_ID === 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com') {
-    alert('Setup required: replace YOUR_CLIENT_ID_HERE with your OAuth Client ID.');
-    return;
-  }
-  if (!_gapiReady) {
-    alert('Google API (gapi) not loaded yet. Check your network connection and that the file is served over HTTP/HTTPS, not opened as a local file://');
-    return;
-  }
-  if (!_gisReady) {
-    alert('Google Identity Services not loaded yet. Check your network connection and that the file is served over HTTP/HTTPS, not opened as a local file://');
-    return;
-  }
-  if (!tokenClient) {
-    alert('Token client not initialised — maybeInit() did not complete. Check the browser console for errors.');
-    return;
-  }
-  tokenClient.requestAccessToken({ prompt: 'consent' });
+    };
+    reader.readAsText(file);
+  };
+  input.click();
 }
 
 function getStatus(id) { return state[id]?.status || 'unordered'; }
@@ -773,8 +667,8 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => applyFilter(btn.dataset.filter));
 });
 
-// Render table immediately — auth is independent, table shows regardless
 document.addEventListener('DOMContentLoaded', () => {
+  state = loadState();
   buildTable();
   updateStats();
 });
